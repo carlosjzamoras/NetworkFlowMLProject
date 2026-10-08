@@ -44,3 +44,20 @@ Each instance is solved with Pyomo/HiGHS, and the optimal flows serve as trainin
 ## Network
 
 Full image of the network included below.
+<img width="926" height="661" alt="network" src="https://github.com/user-attachments/assets/0669a997-f720-44c5-afbb-cfcecfcc97f4" />
+
+# Machine Learning Formulation
+
+The problem is a graph by nature (cities as nodes, routes as edges), which makes a Graph Neural Network the natural choice. A convolutional neural network assumes a regular grid of data, like pixels in an image. A graph has no inherent node ordering, so standard GNN layers are built to be **permutation equivariant**: relabeling the nodes relabels the outputs the same way and changes nothing else.
+
+**Per-Edge Weights (PEW).** The architecture follows *Graph Neural Modeling of Network Flows* (Darvariu, Hailes & Musolesi, University College London, arXiv:2209.05208). PEW extends a graph attention network by giving **each edge its own trainable parameters** instead of sharing one weight matrix across all edges.  PEW is designed for a fixed network topology, so this project keeps a single canonical edge ordering across all samples. That way, edge *e* always refers to the same physical route.
+
+**Physics-informed capacity penalty.** Drawing on Physics-Informed Neural Networks, the training loss adds a soft penalty for predicted flows that exceed edge capacity. This pushes the model toward feasible solutions without hard-coding the constraint.
+
+**Virtual node for global context.** Message passing only spreads information a few hops per layer. As a result, an intermediate node cannot tell how much demand is still unmet elsewhere or how much supply an origin has already used. Following *Neural Message Passing for Quantum Chemistry* (Gilmer et al., 2017), the model adds a **virtual node** connected to every city. The virtual node aggregates and rebroadcasts a summary of the whole graph's state, which gives every node global context.
+
+**Residual connections.** Following ResNet (He et al., 2016), the model uses skip connections between layers to stabilize training as depth increases.
+
+### Results
+On a held-out test set, adding an LP-objective term to the training loss cut the model's total cost from 4.2× to 2.9× the LP optimum and its unmet demand from 84% to 58% (the LP leaves 17%), while keeping capacity violations under 0.01%. These results come from a preliminary run on 40k training samples for 15 epochs with no tuning. Next we'll train on the full 82k samples for 30 epochs and tune the loss weights, learning rate and architecture to close the remaining gap to the LP.
+*[Pending]*
